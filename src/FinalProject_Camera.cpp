@@ -156,9 +156,28 @@ int main(int argc, const char *argv[])
         {
             detKeypointsShiTomasi(keypoints, imgGray, false);
         }
-        else
+        else if (detectorType.compare("HARRIS") == 0)
         {
-            //...
+            detKeypointsHarris(keypoints, imgGray, false);
+        } else
+        {
+            detKeypointsModern(keypoints, imgGray, detectorType, false);
+        }
+
+        // only keep keypoints on the preceding vehicle
+        bool bFocusOnVehicle = true;
+        vector<cv::KeyPoint> keypoints_filtered;
+        cv::Rect vehicleRect(535, 180, 180, 150);
+        if (bFocusOnVehicle)
+        {
+            for (auto it = keypoints.begin(); it != keypoints.end(); ++it)
+            {
+                double kptOverlap = vehicleRect.contains((*it).pt);
+                if (kptOverlap > 0.0)
+                    keypoints_filtered.push_back(*it);
+            }
+            keypoints = keypoints_filtered;
+            cout << "ROI keypoints n=" << keypoints_filtered.size() << " keypoints" << endl;
         }
 
         // optional : limit number of keypoints (helpful for debugging and learning)
@@ -185,13 +204,17 @@ int main(int argc, const char *argv[])
 
         cv::Mat descriptors;
         string descriptorType = "BRISK"; // BRISK, BRIEF, ORB, FREAK, AKAZE, SIFT
-        descKeypoints((dataBuffer.end() - 1)->keypoints, (dataBuffer.end() - 1)->cameraImg, descriptors, descriptorType);
+        // Some descriptors' types require specific detector type
+        if ((descriptorType.compare("AKAZE") == 0 && detectorType.compare("AKAZE") == 0) ||
+            descriptorType.compare("AKAZE") != 0)
+            descKeypoints((dataBuffer.end() - 1)->keypoints, (dataBuffer.end() - 1)->cameraImg, descriptors, descriptorType);
+        else
+            cout << "WARNING: Not supported combination detectorType = " << detectorType << " with descriptorType = " << descriptorType << endl;
 
         // push descriptors for current frame to end of data buffer
         (dataBuffer.end() - 1)->descriptors = descriptors;
 
         cout << "#6 : EXTRACT DESCRIPTORS done" << endl;
-
 
         if (dataBuffer.size() > 1) // wait until at least two images have been processed
         {
@@ -212,6 +235,24 @@ int main(int argc, const char *argv[])
 
             cout << "#7 : MATCH KEYPOINT DESCRIPTORS done" << endl;
 
+            // visualize matches between current and previous image
+            bVis = false;
+            if (bVis)
+            {
+                cv::Mat matchImg = ((dataBuffer.end() - 1)->cameraImg).clone();
+                cv::drawMatches((dataBuffer.end() - 2)->cameraImg, (dataBuffer.end() - 2)->keypoints,
+                                (dataBuffer.end() - 1)->cameraImg, (dataBuffer.end() - 1)->keypoints,
+                                matches, matchImg,
+                                cv::Scalar::all(-1), cv::Scalar::all(-1),
+                                vector<char>(), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+
+                string windowName = "Matching keypoints between two camera images";
+                cv::namedWindow(windowName, 7);
+                cv::imshow(windowName, matchImg);
+                cout << "Press key to continue to next image" << endl;
+                cv::waitKey(0); // wait for key to be pressed
+            }
+            bVis = false;
             
             /* TRACK 3D OBJECT BOUNDING BOXES */
 
