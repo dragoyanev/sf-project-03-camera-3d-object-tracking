@@ -149,7 +149,26 @@ void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPo
 void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
                      std::vector<LidarPoint> &lidarPointsCurr, double frameRate, double &TTC)
 {
-    // ...
+    // Zero movement detection threshold
+    const double zeroMovementDistance = 0.000001;
+    // Time between two measurements in seconds
+    double dT = 1/frameRate;
+
+    double minXPrev = 1e9, minXCurr = 1e9;
+    for (auto it = lidarPointsPrev.begin(); it != lidarPointsPrev.end(); it++)
+    {
+        minXPrev = minXPrev > it->x ? it->x : minXPrev;
+    }
+
+    for (auto it = lidarPointsCurr.begin(); it != lidarPointsCurr.end(); it++)
+    {
+        minXCurr = minXCurr > it->x ? it->x : minXCurr;
+    }
+
+    double distanceChange = minXPrev - minXCurr;
+    if (distanceChange < zeroMovementDistance)
+        distanceChange = zeroMovementDistance;
+    TTC = minXCurr * dT / distanceChange;
 }
 
 
