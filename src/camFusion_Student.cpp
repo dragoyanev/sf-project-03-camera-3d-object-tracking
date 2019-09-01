@@ -178,19 +178,17 @@ void matchBoundingBoxes(std::vector<cv::DMatch> &matches, std::map<int, int> &bb
             continue;
         }
 
-        std::vector<BoundingBox> &boundingBoxes = prevFrame.boundingBoxes;
         int bbIdxPrev;
 
         // if the keypoint does not belong to any bounding box in previous image skip
-        if (!pointFromBoundingBox(boundingBoxes, prevImgKpt, &bbIdxPrev))
+        if (!pointFromBoundingBox(prevFrame.boundingBoxes, prevImgKpt, &bbIdxPrev))
         {
             continue;
         }
 
-        boundingBoxes = currFrame.boundingBoxes;
         int bbIdxCurr;
         // if the keypoint does not belong to any bounding box in current image skip
-        if (!pointFromBoundingBox(boundingBoxes, currImgKpt, &bbIdxCurr))
+        if (!pointFromBoundingBox(currFrame.boundingBoxes, currImgKpt, &bbIdxCurr))
         {
             continue;
         }
