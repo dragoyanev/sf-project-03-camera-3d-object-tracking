@@ -2,6 +2,7 @@
 #include <iostream>
 #include <algorithm>
 #include <numeric>
+#include <map>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
@@ -154,5 +155,130 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
 
 void matchBoundingBoxes(std::vector<cv::DMatch> &matches, std::map<int, int> &bbBestMatches, DataFrame &prevFrame, DataFrame &currFrame)
 {
-    // ...
+    map<pair<int, int>, int> matchesCounter;
+    // Assign only the best matches pairs according this threshold
+    const int thresholdKeypointsMatchesCount = 20;
+
+    // Loop all matchpoints
+    // Find to which bounding box pair (ids of both image bounding boxes) belongs
+    for (auto it = matches.begin(); it != matches.end(); ++it)
+    {
+        int kptIdxPrevImg = (*it).queryIdx;
+        int kptIdxCurrImg = (*it).trainIdx;
+        cv::Point2f prevImgKpt;
+        cv::Point2f currImgKpt;
+        try
+        {
+            prevImgKpt = prevFrame.keypoints.at(kptIdxPrevImg).pt;
+            currImgKpt = currFrame.keypoints.at(kptIdxCurrImg).pt;
+        }
+        catch (const out_of_range &ex) // We should never land hare as the indices are taken from the keypoints vectors
+        {
+            cout << "out_of_range Exception Caught :: " << ex.what() << endl;
+            continue;
+        }
+
+        std::vector<BoundingBox> &boundingBoxes = prevFrame.boundingBoxes;
+        int bbIdxPrev;
+
+        // if the keypoint does not belong to any bounding box in previous image skip
+        if (!pointFromBoundingBox(boundingBoxes, prevImgKpt, &bbIdxPrev))
+        {
+            continue;
+        }
+
+        boundingBoxes = currFrame.boundingBoxes;
+        int bbIdxCurr;
+        // if the keypoint does not belong to any bounding box in current image skip
+        if (!pointFromBoundingBox(boundingBoxes, currImgKpt, &bbIdxCurr))
+        {
+            continue;
+        }
+
+        map<pair<int, int>, int>::iterator mapIt;
+        pair<int, int> bbIdxPair = make_pair(bbIdxPrev, bbIdxCurr);
+
+        mapIt = matchesCounter.find(bbIdxPair);
+        if (mapIt == matchesCounter.end()) // key not present in map
+        {
+            // Add new matching bounding boxes pair
+            matchesCounter.insert(make_pair(bbIdxPair, 1));
+        }
+        else // key present in map
+        {
+            // Count matching bounding boxes pair hits
+            mapIt->second = mapIt->second + 1;
+        }
+    }
+
+
+    multimap<int, pair<int, int>> matchesCountKeys;
+    map<pair<int, int>, int>::iterator mapIt = matchesCounter.begin();
+
+    // Swap key-value from the original map in order to sort by value
+    // We can have same value(our counter) and this will lead to repeating key in the new map
+    // thats why we need multimap
+    while (mapIt != matchesCounter.end())
+    {
+        matchesCountKeys.insert(make_pair(mapIt->second, mapIt->first));
+        mapIt++;
+    }
+
+    multimap<int, pair<int, int>>::iterator multimapIt = matchesCountKeys.begin();
+    while (multimapIt != matchesCountKeys.end())
+    {
+        // Assign only the best matches according a threshold
+        if (multimapIt->first > thresholdKeypointsMatchesCount)
+        {
+            bbBestMatches.insert(multimapIt->second);
+        }
+        multimapIt++;
+    }
 }
+
+
+
+
+
+
+
+
+
+
+bool pointFromBoundingBox(std::vector<BoundingBox> &boundingBoxes, cv::Point2f kpt, int *bbIdx)
+{
+    float shrinkFactor = 0.10; // shrinks each bounding box by the given percentage to avoid 3D object merging at the edges of an ROI
+
+    *bbIdx = -1;
+    vector<vector<BoundingBox>::iterator> enclosingBoxes; // pointers to all bounding boxes which enclose the current match point
+    for (vector<BoundingBox>::iterator it2 = boundingBoxes.begin(); it2 != boundingBoxes.end(); ++it2)
+    {
+        // shrink current bounding box slightly to avoid having too many outlier points around the edges
+        cv::Rect smallerBox;
+        smallerBox.x = (*it2).roi.x + shrinkFactor * (*it2).roi.width / 2.0;
+        smallerBox.y = (*it2).roi.y + shrinkFactor * (*it2).roi.height / 2.0;
+        smallerBox.width = (*it2).roi.width * (1 - shrinkFactor);
+        smallerBox.height = (*it2).roi.height * (1 - shrinkFactor);
+
+        // check wether point is within current bounding box
+        if (smallerBox.contains(kpt))
+        {
+            enclosingBoxes.push_back(it2);
+        }
+
+    } // eof loop over all bounding boxes
+
+    // check wether point has been enclosed by one or by multiple boxes
+    if (enclosingBoxes.size() == 1)
+    {
+        *bbIdx = enclosingBoxes[0]->boxID;
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+
+
+}
+
