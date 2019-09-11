@@ -155,15 +155,44 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
     double dT = 1/frameRate;
 
     double minXPrev = 1e9, minXCurr = 1e9;
+    std::vector<double> minXPrevVector(10, minXPrev);
+    std::vector<double> minXCurrVector(10, minXCurr);
+
     for (auto it = lidarPointsPrev.begin(); it != lidarPointsPrev.end(); it++)
     {
-        minXPrev = minXPrev > it->x ? it->x : minXPrev;
+        if (minXPrev > it->x)
+        {
+            minXPrev = it->x;
+        }
+
+        for (auto i = minXPrevVector.begin(); i != minXPrevVector.end(); i++)
+        {
+            if (*i > it->x)
+            {
+                minXPrevVector.insert(i, minXPrev);
+                minXPrevVector.resize(10);
+                break;
+            }
+        }
     }
 
     for (auto it = lidarPointsCurr.begin(); it != lidarPointsCurr.end(); it++)
     {
-        minXCurr = minXCurr > it->x ? it->x : minXCurr;
+        if (minXCurr > it->x)
+        {
+            minXCurr = it->x;
+//            minXCurrVector.push_back(minXCurr);
+        }
     }
+
+    // Make some filtering of outliers
+    for (auto i = minXPrevVector.begin(); i != minXPrevVector.end(); i++)
+    {
+        std::cout<<"Values min="<<*i<<std::endl;
+    }
+
+
+
 
     double distanceChange = minXPrev - minXCurr;
     if (distanceChange < zeroMovementDistance)
