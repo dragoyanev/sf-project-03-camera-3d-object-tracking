@@ -169,7 +169,7 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
         {
             if (*i > it->x)
             {
-                minXPrevVector.insert(i, minXPrev);
+                minXPrevVector.insert(i, it->x);
                 minXPrevVector.resize(10);
                 break;
             }
@@ -181,23 +181,83 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
         if (minXCurr > it->x)
         {
             minXCurr = it->x;
-//            minXCurrVector.push_back(minXCurr);
         }
+
+        for (auto i = minXCurrVector.begin(); i != minXCurrVector.end(); i++)
+        {
+            if (*i > it->x)
+            {
+                minXCurrVector.insert(i, it->x);
+                minXCurrVector.resize(10);
+                break;
+            }
+        }
+    }
+
+    double avgXPrev;
+    double avgXCurr;
+
+    double newMinXPrev;
+    double newMinXCurr;
+    double thresholdDiffMin = 0.006;
+    for (auto i = minXPrevVector.begin(); i != minXPrevVector.end(); i++)
+    {
+        newMinXPrev = *i;
+        if (*(i+1) - (*i) > thresholdDiffMin)
+            continue;
+        else
+            break;
+    }
+
+    for (auto i = minXCurrVector.begin(); i != minXCurrVector.end(); i++)
+    {
+        newMinXCurr = *i;
+        if (*(i+1) - (*i) > thresholdDiffMin)
+            continue;
+        else
+            break;
     }
 
     // Make some filtering of outliers
     for (auto i = minXPrevVector.begin(); i != minXPrevVector.end(); i++)
     {
-        std::cout<<"Values min="<<*i<<std::endl;
+        avgXPrev +=*i;
+        std::cout<<"Values PrevMin="<<*i<<std::endl;
     }
+    avgXPrev = avgXPrev/minXPrevVector.size();
+    std::cout<<"Avg PrevMin="<<avgXPrev<<" thresPrev="<<newMinXPrev<< std::endl;
 
-
-
+    for (auto i = minXCurrVector.begin(); i != minXCurrVector.end(); i++)
+    {
+        avgXCurr += *i;
+        std::cout<<"Values CurrMin="<<*i<<std::endl;
+    }
+    avgXCurr = avgXCurr/minXCurrVector.size();
+    std::cout<<"Avg CurrMin="<<avgXCurr<<" thresCurr="<<newMinXCurr<< std::endl;
 
     double distanceChange = minXPrev - minXCurr;
-    if (distanceChange < zeroMovementDistance)
+    double distanceChangeFive = minXPrevVector.at(minXPrevVector.size() - 1) - minXCurrVector.at(minXCurrVector.size() - 1);
+    double distanceChangeAvg = avgXPrev - avgXCurr;
+    double distanceChangeThres = newMinXPrev - newMinXCurr;
+
+    // Division by zero protection
+    if (std::abs(distanceChange) < zeroMovementDistance)
         distanceChange = zeroMovementDistance;
-    TTC = minXCurr * dT / distanceChange;
+    if (std::abs(distanceChangeFive) < zeroMovementDistance)
+        distanceChangeFive = zeroMovementDistance;
+    if (std::abs(distanceChangeAvg) < zeroMovementDistance)
+        distanceChangeAvg = zeroMovementDistance;
+    if (std::abs(distanceChangeThres) < zeroMovementDistance)
+        distanceChangeThres = zeroMovementDistance;
+
+    double TTCfirstPoint = minXCurr * dT / distanceChange;
+    double TTCfive = minXCurrVector.at(minXCurrVector.size() - 1) * dT / distanceChangeFive;
+    double TTCavg = avgXCurr * dT / distanceChangeAvg;
+    double TTCthres = newMinXCurr * dT / distanceChangeThres;
+
+    TTC = TTCfive;
+
+    std::cout<<"ttc="<<TTCfirstPoint<<" Fifth="<<TTCfive<< " avgTTC="<< TTCavg<<" thresTTC="<< TTCthres<< std::endl;
 }
 
 
