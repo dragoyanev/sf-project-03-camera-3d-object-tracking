@@ -153,10 +153,15 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
     const double zeroMovementDistance = 0.000001;
     // Time between two measurements in seconds
     double dT = 1/frameRate;
+    int minPointsSize = 20;
+    // All points in solid object are close to each others
+    // Any point that is away should be outlier
+    double thresholdDiffMin = 0.006;
+    double thresholdDiffAvgMin = 0.01;
 
     double minXPrev = 1e9, minXCurr = 1e9;
-    std::vector<double> minXPrevVector(10, minXPrev);
-    std::vector<double> minXCurrVector(10, minXCurr);
+    std::vector<double> minXPrevVector(minPointsSize, minXPrev);
+    std::vector<double> minXCurrVector(minPointsSize, minXCurr);
 
     for (auto it = lidarPointsPrev.begin(); it != lidarPointsPrev.end(); it++)
     {
@@ -170,7 +175,7 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
             if (*i > it->x)
             {
                 minXPrevVector.insert(i, it->x);
-                minXPrevVector.resize(10);
+                minXPrevVector.resize(minPointsSize);
                 break;
             }
         }
@@ -188,7 +193,7 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
             if (*i > it->x)
             {
                 minXCurrVector.insert(i, it->x);
-                minXCurrVector.resize(10);
+                minXCurrVector.resize(minPointsSize);
                 break;
             }
         }
@@ -199,7 +204,6 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
 
     double newMinXPrev;
     double newMinXCurr;
-    double thresholdDiffMin = 0.006;
     for (auto i = minXPrevVector.begin(); i != minXPrevVector.end(); i++)
     {
         newMinXPrev = *i;
@@ -225,7 +229,18 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
         std::cout<<"Values PrevMin="<<*i<<std::endl;
     }
     avgXPrev = avgXPrev/minXPrevVector.size();
-    std::cout<<"Avg PrevMin="<<avgXPrev<<" thresPrev="<<newMinXPrev<< std::endl;
+
+    double newAvgMinXPrev;
+    for (auto i = minXPrevVector.begin(); i != minXPrevVector.end(); i++)
+    {
+        newAvgMinXPrev = *i;
+        // Discards outliers that are the closest points to us
+        if (std::abs(avgXPrev - (*i)) > thresholdDiffAvgMin)
+            continue;
+        else
+            break;
+    }
+    std::cout<<"Avg PrevMin="<<avgXPrev<<" thresPrev="<<newMinXPrev<< " AvgTresMinXPrev="<< newAvgMinXPrev<< " RangePrev="<< minXPrevVector.at(minXPrevVector.size() -1) - *(minXPrevVector.begin()) <<std::endl;
 
     for (auto i = minXCurrVector.begin(); i != minXCurrVector.end(); i++)
     {
@@ -233,12 +248,24 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
         std::cout<<"Values CurrMin="<<*i<<std::endl;
     }
     avgXCurr = avgXCurr/minXCurrVector.size();
-    std::cout<<"Avg CurrMin="<<avgXCurr<<" thresCurr="<<newMinXCurr<< std::endl;
+
+    double newAvgMinXCurr;
+    for (auto i = minXCurrVector.begin(); i != minXCurrVector.end(); i++)
+    {
+        newAvgMinXCurr = *i;
+        // Discards outliers that are the closest points to us
+        if (std::abs(avgXCurr - (*i)) > thresholdDiffAvgMin)
+            continue;
+        else
+            break;
+    }
+    std::cout<<"Avg CurrMin="<<avgXCurr<<" thresCurr="<<newMinXCurr <<" AvgTresMinXcurr="<< newAvgMinXCurr<<" RangeCurr="<< minXCurrVector.at(minXCurrVector.size() -1) - *(minXCurrVector.begin()) << std::endl;
 
     double distanceChange = minXPrev - minXCurr;
     double distanceChangeFive = minXPrevVector.at(minXPrevVector.size() - 1) - minXCurrVector.at(minXCurrVector.size() - 1);
     double distanceChangeAvg = avgXPrev - avgXCurr;
     double distanceChangeThres = newMinXPrev - newMinXCurr;
+    double distanceChangeAvgThres = newAvgMinXPrev - newAvgMinXCurr;
 
     // Division by zero protection
     if (std::abs(distanceChange) < zeroMovementDistance)
@@ -249,15 +276,18 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
         distanceChangeAvg = zeroMovementDistance;
     if (std::abs(distanceChangeThres) < zeroMovementDistance)
         distanceChangeThres = zeroMovementDistance;
+    if (std::abs(distanceChangeAvgThres) < zeroMovementDistance)
+        distanceChangeAvgThres = zeroMovementDistance;
 
     double TTCfirstPoint = minXCurr * dT / distanceChange;
     double TTCfive = minXCurrVector.at(minXCurrVector.size() - 1) * dT / distanceChangeFive;
     double TTCavg = avgXCurr * dT / distanceChangeAvg;
     double TTCthres = newMinXCurr * dT / distanceChangeThres;
+    double TTCAvgThres = newAvgMinXCurr * dT / distanceChangeAvgThres;
 
-    TTC = TTCfive;
+    TTC = TTCAvgThres;
 
-    std::cout<<"ttc="<<TTCfirstPoint<<" Fifth="<<TTCfive<< " avgTTC="<< TTCavg<<" thresTTC="<< TTCthres<< std::endl;
+    std::cout<<"ttc="<<TTCfirstPoint<<" Fifth="<<TTCfive<< " avgTTC="<< TTCavg<<" thresTTC="<< TTCthres<<" TTCAvgThres="<<TTCAvgThres<< std::endl;
 }
 
 
@@ -317,7 +347,6 @@ void matchBoundingBoxes(std::vector<cv::DMatch> &matches, std::map<int, int> &bb
         }
     }
 
-
     multimap<int, pair<int, int>> matchesCountKeys;
     map<pair<int, int>, int>::iterator mapIt = matchesCounter.begin();
 
@@ -341,15 +370,6 @@ void matchBoundingBoxes(std::vector<cv::DMatch> &matches, std::map<int, int> &bb
         multimapIt++;
     }
 }
-
-
-
-
-
-
-
-
-
 
 bool pointFromBoundingBox(std::vector<BoundingBox> &boundingBoxes, cv::Point2f kpt, int *bbIdx)
 {
@@ -384,7 +404,4 @@ bool pointFromBoundingBox(std::vector<BoundingBox> &boundingBoxes, cv::Point2f k
     {
         return false;
     }
-
-
 }
-
