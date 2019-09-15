@@ -134,7 +134,39 @@ void show3DObjects(std::vector<BoundingBox> &boundingBoxes, cv::Size worldSize, 
 // associate a given bounding box with the keypoints it contains
 void clusterKptMatchesWithROI(BoundingBox &boundingBox, std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPoint> &kptsCurr, std::vector<cv::DMatch> &kptMatches)
 {
-    // ...
+    // Loop all matchpoints
+    // Find if belongs to the bounding box ROI
+    for (auto it = kptMatches.begin(); it != kptMatches.end(); ++it)
+    {
+        int kptIdxPrevImg = (*it).queryIdx;
+        int kptIdxCurrImg = (*it).trainIdx;
+        cv::Point2f prevImgKpt;
+        cv::Point2f currImgKpt;
+        try
+        {
+            prevImgKpt = kptsPrev.at(kptIdxPrevImg).pt;
+            currImgKpt = kptsCurr.at(kptIdxCurrImg).pt;
+        }
+        catch (const out_of_range &ex) // We should never land here as the indices are taken from the keypoints vectors
+        {
+            cout << "out_of_range Exception Caught :: " << ex.what() << endl;
+            continue;
+        }
+
+        std::vector<BoundingBox> boundingBoxes;
+        boundingBoxes.push_back(boundingBox);
+
+        int bbIdxCurr;
+        // if the keypoint does not belong to bounding box in current image skip
+        if (!pointFromBoundingBox(boundingBoxes, currImgKpt, &bbIdxCurr))
+        {
+            continue;
+        }
+
+        // If we reach that point this means the match pair is in the bounding box
+        boundingBox.kptMatches.push_back(*it);
+        boundingBox.keypoints.push_back(kptsCurr.at(kptIdxCurrImg));
+    }
 }
 
 
