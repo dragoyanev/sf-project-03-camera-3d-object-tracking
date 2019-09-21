@@ -223,7 +223,14 @@ void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPo
         double midIndex = (distRatios.size() + 1) / 2.0;
         double medianDistRatio = (distRatios.at(std::floor(midIndex) - 1) + distRatios.at(std::ceil(midIndex) - 1)) / 2.0;
 
-        TTC = -dT / (1 - medianDistRatio);
+        const double zeroMovementDistanceTTC = 1e9;
+
+        // Detect division by zero
+        if (std::abs(1 - medianDistRatio) < std::numeric_limits<double>::epsilon())
+            TTC = zeroMovementDistanceTTC;
+        else
+            TTC = -dT / (1 - medianDistRatio);
+        std::cout<<"Cam ttc="<< TTC << std::endl;
 }
 
 
