@@ -21,10 +21,11 @@ this file is providing all information
 ## FP.5 Performance Evaluation 1 
 At several frames from the Lidar cloud points there are outlier points that are appearing and making calculations to jump.
 I observe places where after filtering the outliers points the TTC result again jumps too much. 
+
 I believe possible reasons for this are:
-1.The Lidar sensor frame rate is not constant and TTC calculations relying on constant frame rate gives estimation error
-2.The Lidar frame rate is too low and cannot detect reliably the quicker dynamic changes in the acceleration/deceleration between the ego car and the car in front of us. We see jumping in the results
-3.The surface of the preceding vehicle is making noisy reflections and the resulting point cloud is with inconsistent points density
+ 1.The Lidar sensor frame rate is not constant and TTC calculations relying on constant frame rate gives estimation error
+ 2.The Lidar frame rate is too low and cannot detect reliably the quicker dynamic changes in the acceleration/deceleration between the ego car and the car in front of us. We see jumping in the results
+ 3.The surface of the preceding vehicle is making noisy reflections and the resulting point cloud is with inconsistent points density
 
 Until frame 6 we have ttc=~12s then it jumps in frame[7]=7s;  frame[8]=44s frame[9]=24s then it again is returned to ttc= ~12s. Because we use results from one frame in two calculations the error is spread in several calculations. 
 At frame[44]=16s the TTC is jumping a lot compared to the previous and next frames that have ttc=~5s
