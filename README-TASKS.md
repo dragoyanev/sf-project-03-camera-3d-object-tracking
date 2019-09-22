@@ -42,6 +42,7 @@ Shared [table](https://docs.google.com/spreadsheets/d/1hf6fANiiCgElG7U1ZphyN-TaG
 The detectors returning more keypoints calculates better the TTC. The reason is in the stable search for match points. When more points are used the TTC is calculated more robust.
 
 `AKAZE` detector is most stable method no matter which descriptor is used after that.
+
 `SHI-THOMASI` detector is giving good stable results but only when used with descriptor `BRISK` and `FREAK`. With other descriptors there are some fluctuations in several frames (frame 8-9).
 
 Some of the detectors are giving not stable estimations and are not good to be used like `ORB`, `BRISK` and `HARRIS`.
